@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import sys
 
 import numpy as np
+import time
 from tqdm import tqdm
 
 
@@ -116,6 +117,8 @@ class DCGAN():
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
 
+        start_time = time.time()
+
         for epoch in range(epochs):
 
             # ---------------------
@@ -143,7 +146,7 @@ class DCGAN():
             g_loss = self.combined.train_on_batch(noise, valid)
 
             # Plot the progress
-            print("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100 * d_loss[1], g_loss))
+            print("%d [D loss: %f, acc.: %.2f%%] [G loss: %f] [time cost: %.4fs]" % (epoch, d_loss[0], 100 * d_loss[1], g_loss, (time.time() - start_time)))
 
             # If at save interval => save generated image samples
             if epoch % save_interval == 0:
@@ -170,4 +173,4 @@ class DCGAN():
 
 if __name__ == '__main__':
     dcgan = DCGAN()
-    dcgan.train(epochs=100, batch_size=32, save_interval=50)
+    dcgan.train(epochs=4000, batch_size=32, save_interval=50)
