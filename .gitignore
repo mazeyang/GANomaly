@@ -3,6 +3,9 @@
 
 __pycache__
 
-images
-
 *.png
+
+test_lab
+
+gan/discriminator
+gan/generator
