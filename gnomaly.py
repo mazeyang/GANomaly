@@ -20,9 +20,8 @@ warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
 
-# Model
 class Ganomaly:
-    def __init__(self, latent_dim=100, input_shape=(28, 28, 1), batch_size=128, epochs=40, anomaly_class=2):
+    def __init__(self, latent_dim=100, input_shape=(28, 28, 1), batch_size=128, epochs=40000, anomaly_class=2):
         self.latent_dim = latent_dim
         self.input_shape = input_shape
         self.batch_size = batch_size
@@ -66,6 +65,7 @@ class Ganomaly:
 
         self.X_train, self.Y_train, self.X_test, self.Y_test = X_train, Y_train, X_test, Y_test
 
+        print('train samples: %d, test samples: %d.' % (len(self.X_train), len(self.X_test)))
         print('[OK]')
 
     def basic_encoder(self):
@@ -171,11 +171,11 @@ class Ganomaly:
         self.z_ = self.encoder2(self.img_)
 
         # The discriminator takes generated images as input and determines if real or fake
-        self.real = self.discriminator(self.img_)
+        self.real_or_fake = self.discriminator(self.img_)
 
-        self.bigan_generator = Model(self.img, [self.real, self.img_, self.z_])
-        self.bigan_generator.compile(loss=['binary_crossentropy', 'mean_absolute_error', 'mean_squared_error'],
-                                     optimizer=self.optimizer)
+        self.ganomaly_model = Model(self.img, [self.real_or_fake, self.img_, self.z_])
+        self.ganomaly_model.compile(loss=['binary_crossentropy', 'mean_absolute_error', 'mean_squared_error'],
+                                    optimizer=self.optimizer)
 
         self.g_loss_list = []
         self.d_loss_list = []
@@ -212,7 +212,7 @@ class Ganomaly:
             # ---------------------
 
             # Train the generator (z -> img is valid and img -> z is is invalid)
-            g_loss = self.bigan_generator.train_on_batch(imgs, [real, imgs, z])
+            g_loss = self.ganomaly_model.train_on_batch(imgs, [real, imgs, z])
 
             # Plot the progress
             print("epoch: %d [D loss: %f, acc: %.2f%%] [G loss: %f]" %
@@ -232,7 +232,6 @@ class Ganomaly:
 
     def find_scores(self):
         print('find_scores...')
-        print('%d test samples.' % len(self.X_test))
         print('generate z1...')
         z1_gen_ema = self.encoder1.predict(self.X_test)
         print('generate fake images...')
@@ -263,7 +262,7 @@ class Ganomaly:
 
 
 if __name__ == '__main__':
-    model = Ganomaly(batch_size=128, epochs=2, anomaly_class=2)
+    model = Ganomaly(batch_size=128, epochs=10, anomaly_class=2)
     model.train()
     model.show_loss()
     model.find_scores()
