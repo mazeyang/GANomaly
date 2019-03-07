@@ -232,12 +232,15 @@ class Ganomaly:
 
     def find_scores(self):
         print('find_scores...')
+        print('%d test samples.' % self.X_test)
+        print('generate z1...')
         z1_gen_ema = self.encoder1.predict(self.X_test)
+        print('generate fake images...')
         reconstruct_ema = self.generator.predict(z1_gen_ema)
+        print('generate z2...')
         z2_gen_ema = self.encoder2.predict(reconstruct_ema)
 
         val_list = []
-        print('%d test samples.' % self.X_test)
         for i in range(0, len(self.X_test)):
             val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
 
