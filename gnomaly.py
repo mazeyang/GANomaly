@@ -148,9 +148,11 @@ class Ganomaly:
 
     def make_components(self):
         print('make components...')
-        self.discriminator = self.make_discriminator()
 
         self.optimizer = Adam(0.0001, 0.5)
+
+        self.discriminator = self.make_discriminator()
+        self.discriminator.trainable = True
 
         # Build and compile the discriminator
         self.discriminator.compile(loss=['binary_crossentropy'], optimizer=self.optimizer, metrics=['accuracy'])
@@ -218,7 +220,7 @@ class Ganomaly:
             self.g_loss_list.append(g_loss)
             self.d_loss_list.append(d_loss)
 
-        print('OK.')
+        print('[OK]')
 
     def show_loss(self):
         plt.plot(np.asarray(self.g_loss_list)[:, 0], label='G loss')
@@ -235,6 +237,7 @@ class Ganomaly:
         z2_gen_ema = self.encoder2.predict(reconstruct_ema)
 
         val_list = []
+        print('%d test samples.' % self.X_test)
         for i in range(0, len(self.X_test)):
             val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
 
@@ -251,13 +254,13 @@ class Ganomaly:
         # roc_auc_scores.append(roc_auc)
         # prauc_scores.append(prauc)
 
-        print("ROC AUC SCORE FOR %d: %f" % (self.anomaly_class, roc_auc))
-        print("PRAUC SCORE FOR %d: %f" % (self.anomaly_class, prauc))
+        print("ROC AUC SCORE FOR [%d](anomaly class): %f" % (self.anomaly_class, roc_auc))
+        print("PRAUC SCORE FOR [%d](anomaly class): %f" % (self.anomaly_class, prauc))
         print('[OK]')
 
 
 if __name__ == '__main__':
-    model = Ganomaly()
+    model = Ganomaly(batch_size=128, epochs=2, anomaly_class=2)
     model.train()
     model.show_loss()
     model.find_scores()
