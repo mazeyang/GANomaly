@@ -7,25 +7,22 @@ from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
 
+from sklearn.metrics import roc_auc_score, average_precision_score
 from sklearn.model_selection import train_test_split
 
 import numpy as np
 import warnings
-import matplotlib
+import matplotlib.pyplot as plt
+import os
 
-matplotlib.use('Agg')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
-
-num_remove = 2
-
-
-
 
 
 # Model
 class Ganomaly:
-    def __init__(self, latent_dim=100, input_shape=(28, 28, 1), batch_size=128, epochs=400, anomaly_class=2):
+    def __init__(self, latent_dim=100, input_shape=(28, 28, 1), batch_size=128, epochs=40, anomaly_class=2):
         self.latent_dim = latent_dim
         self.input_shape = input_shape
         self.batch_size = batch_size
@@ -33,6 +30,7 @@ class Ganomaly:
         self.anomaly_class = anomaly_class
 
     def get_data(self):
+        print('get train and tst data...')
         (X1, Y1), (X2, Y2) = mnist.load_data()
         X = np.vstack([X1, X2])
         Y = np.hstack([Y1, Y2])
@@ -66,7 +64,9 @@ class Ganomaly:
         X_train = np.expand_dims(X_train, axis=3)
         X_test = np.expand_dims(X_test, axis=3)
 
-        return X_train, X_test
+        self.X_train, self.Y_train, self.X_test, self.Y_test = X_train, Y_train, X_test, Y_test
+
+        print('[OK]')
 
     def basic_encoder(self):
         modelE = Sequential()
@@ -174,21 +174,19 @@ class Ganomaly:
         self.bigan_generator = Model(self.img, [self.real, self.img_, self.z_])
         self.bigan_generator.compile(loss=['binary_crossentropy', 'mean_absolute_error', 'mean_squared_error'],
                                      optimizer=self.optimizer)
-        print('OK.')
+
+        self.g_loss_list = []
+        self.d_loss_list = []
+
+        print('[OK]')
 
     def train(self):
+        self.get_data()
         self.make_components()
-
-        print('get train and test data...')
-        X_train, X_test = self.get_data()
-        print('OK.')
 
         # Adversarial ground truths
         real = np.ones((self.batch_size, 1))
         fake = np.zeros((self.batch_size, 1))
-
-        g_loss_list = []
-        d_loss_list = []
 
         print('start train...')
         for epoch in range(self.epochs):
@@ -197,8 +195,8 @@ class Ganomaly:
             # ---------------------
 
             # Select a random batch of images and encode/decode/encode
-            idx = np.random.randint(0, X_train.shape[0], self.batch_size)
-            imgs = X_train[idx]
+            idx = np.random.randint(0, self.X_train.shape[0], self.batch_size)
+            imgs = self.X_train[idx]
             z = self.encoder1.predict(imgs)
             imgs_ = self.generator.predict(z)
 
@@ -217,12 +215,49 @@ class Ganomaly:
             # Plot the progress
             print("epoch: %d [D loss: %f, acc: %.2f%%] [G loss: %f]" %
                   (epoch, d_loss[0], 100 * d_loss[1], g_loss[0]))
-            g_loss_list.append(g_loss)
-            d_loss_list.append(d_loss)
+            self.g_loss_list.append(g_loss)
+            self.d_loss_list.append(d_loss)
 
         print('OK.')
+
+    def show_loss(self):
+        plt.plot(np.asarray(self.g_loss_list)[:, 0], label='G loss')
+        plt.plot(np.asarray(self.d_loss_list)[:, 0], label='D loss')
+        plt.plot(np.asarray(self.d_loss_list)[:, 1], label='D accuracy')
+        plt.legend(bbox_to_anchor=(1, 1))
+        plt.savefig("loss/loss_%d.png" % self.anomaly_class, bbox_inches='tight', pad_inches=1)
+        plt.close()
+
+    def find_scores(self):
+        print('find_scores...')
+        z1_gen_ema = self.encoder1.predict(self.X_test)
+        reconstruct_ema = self.generator.predict(z1_gen_ema)
+        z2_gen_ema = self.encoder2.predict(reconstruct_ema)
+
+        val_list = []
+        for i in range(0, len(self.X_test)):
+            val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
+
+        anomaly_labels = np.zeros(len(val_list))
+        for i, label in enumerate(self.Y_test):
+            if label == self.anomaly_class:
+                anomaly_labels[i] = 1
+
+        val_arr = np.asarray(val_list)
+        val_probs = val_arr / max(val_arr)
+
+        roc_auc = roc_auc_score(anomaly_labels, val_probs)
+        prauc = average_precision_score(anomaly_labels, val_probs)
+        # roc_auc_scores.append(roc_auc)
+        # prauc_scores.append(prauc)
+
+        print("ROC AUC SCORE FOR %d: %f" % (self.anomaly_class, roc_auc))
+        print("PRAUC SCORE FOR %d: %f" % (self.anomaly_class, prauc))
+        print('[OK]')
 
 
 if __name__ == '__main__':
     model = Ganomaly()
     model.train()
+    model.show_loss()
+    model.find_scores()
