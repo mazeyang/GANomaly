@@ -232,7 +232,7 @@ class Ganomaly:
 
     def find_scores(self):
         print('find_scores...')
-        print('%d test samples.' % self.X_test)
+        print('%d test samples.' % len(self.X_test))
         print('generate z1...')
         z1_gen_ema = self.encoder1.predict(self.X_test)
         print('generate fake images...')
