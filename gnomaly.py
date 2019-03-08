@@ -220,9 +220,7 @@ class Ganomaly:
             self.g_loss_list.append(g_loss)
             self.d_loss_list.append(d_loss)
 
-        print('[OK]')
-
-    def show_loss(self):
+        # save loss img
         plt.plot(np.asarray(self.g_loss_list)[:, 0], label='G loss')
         plt.plot(np.asarray(self.d_loss_list)[:, 0], label='D loss')
         plt.plot(np.asarray(self.d_loss_list)[:, 1], label='D accuracy')
@@ -230,8 +228,10 @@ class Ganomaly:
         plt.savefig("loss/loss_%d.png" % self.anomaly_class, bbox_inches='tight', pad_inches=1)
         plt.close()
 
-    def find_scores(self):
-        print('find_scores...')
+        print('[OK]')
+
+    def eval(self):
+        print('evaluate on test data...')
         print('generate z1...')
         z1_gen_ema = self.encoder1.predict(self.X_test)
         print('generate fake images...')
@@ -264,5 +264,4 @@ class Ganomaly:
 if __name__ == '__main__':
     model = Ganomaly(batch_size=128, epochs=500, anomaly_class=2)
     model.train()
-    model.show_loss()
-    model.find_scores()
+    model.eval()
