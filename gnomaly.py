@@ -262,7 +262,7 @@ class Ganomaly:
 
 
 if __name__ == '__main__':
-    model = Ganomaly(batch_size=128, epochs=10, anomaly_class=2)
+    model = Ganomaly(batch_size=128, epochs=500, anomaly_class=2)
     model.train()
     model.show_loss()
     model.find_scores()
