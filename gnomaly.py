@@ -14,7 +14,7 @@ import numpy as np
 import warnings
 import matplotlib.pyplot as plt
 import os
-w
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
