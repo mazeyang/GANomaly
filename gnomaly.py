@@ -68,6 +68,11 @@ class Ganomaly:
         print('train samples: %d, test samples: %d.' % (len(self.X_train), len(self.X_test)))
         print('[OK]')
 
+    def find_cls(self, cls):
+        for index, label in enumerate(self.Y_test):
+            if label == cls:
+                return index
+
     def basic_encoder(self):
         modelE = Sequential()
         modelE.add(Conv2D(32, kernel_size=(3, 2), padding="same", input_shape=self.input_shape))
@@ -250,6 +255,12 @@ class Ganomaly:
 
         val_arr = np.asarray(val_list)
         val_probs = val_arr / max(val_arr)
+        print('val_arr:')
+        print(val_arr[:50])
+        print('val_probs:')
+        print(val_probs[:50])
+        print('anomaly labels:')
+        print(anomaly_labels[:50])
 
         roc_auc = roc_auc_score(anomaly_labels, val_probs)
         prauc = average_precision_score(anomaly_labels, val_probs)
@@ -260,9 +271,38 @@ class Ganomaly:
         print("PRAUC SCORE FOR [%d](anomaly class): %f" % (self.anomaly_class, prauc))
         print('[OK]')
 
+        r, c = 2, 10
+
+        print('find_class...')
+        input_list = []
+        for i in range(0, 10):
+            index = self.find_cls(i)
+            input_list.append(self.X_test[index])
+        print('[OK]')
+
+        input_arr = np.asarray(input_list)
+        print('get z gen ema...')
+        z_gen_ema = self.encoder1.predict(input_arr)
+        print('get reconstruct ema...')
+        reconstruct_ema = self.generator.predict(z_gen_ema)
+        print('[OK]')
+        print('it\'s show time')
+        fig, axs = plt.subplots(r, c)
+        for j in range(c):
+            input_pl = np.reshape(input_arr[j], (28, 28))
+            axs[0, j].imshow(input_pl, cmap='gray')
+            axs[0, j].axis('off')
+
+            reconstruct_ema_pl = 0.5 * reconstruct_ema[j] + 0.5
+            reconstruct_ema_pl = np.reshape(reconstruct_ema_pl, (28, 28))
+            axs[1, j].imshow(reconstruct_ema_pl, cmap='gray')
+            axs[1, j].axis('off')
+        fig.savefig("recons_%d.png" % self.anomaly_class)
+        plt.close()
+
 
 if __name__ == '__main__':
-    model = Ganomaly(batch_size=128, epochs=500, anomaly_class=2)
+    model = Ganomaly(batch_size=128, epochs=10, anomaly_class=2)
     model.train()
     model.eval()
 
