@@ -7,7 +7,7 @@ from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
 
-from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.metrics import roc_auc_score, average_precision_score, roc_curve, auc
 from sklearn.model_selection import train_test_split
 
 import numpy as np
@@ -230,7 +230,7 @@ class Ganomaly:
         plt.plot(np.asarray(self.d_loss_list)[:, 0], label='D loss')
         plt.plot(np.asarray(self.d_loss_list)[:, 1], label='D accuracy')
         plt.legend(bbox_to_anchor=(1, 1))
-        plt.savefig("loss/loss_%d.png" % self.anomaly_class, bbox_inches='tight', pad_inches=1)
+        plt.savefig("loss_%d.png" % self.anomaly_class, bbox_inches='tight', pad_inches=1)
         plt.close()
 
         print('[OK]')
@@ -255,18 +255,30 @@ class Ganomaly:
 
         val_arr = np.asarray(val_list)
         val_probs = val_arr / max(val_arr)
-        print('val_arr:')
-        print(val_arr[:50])
-        print('val_probs:')
-        print(val_probs[:50])
-        print('anomaly labels:')
-        print(anomaly_labels[:50])
+        # print('val_arr:')
+        # print(val_arr[:50])
+        # print('val_probs:')
+        # print(val_probs[:50])
+        # print('anomaly labels:')
+        # print(anomaly_labels[:50])
 
+        # preview val
+        idx = np.random.randint(0, len(val_arr), 100)
+        print('-val_arr- -val_probs- -anomaly_labels-')
+        print('--------------------------------------')
+        for i in idx:
+            print(val_arr[i], val_probs[i], anomaly_labels[i])
+
+        fp_rate, tp_rate, thresholds = roc_curve(anomaly_labels, val_probs)
+        auc_rate = auc(fp_rate, tp_rate)
         roc_auc = roc_auc_score(anomaly_labels, val_probs)
         prauc = average_precision_score(anomaly_labels, val_probs)
         # roc_auc_scores.append(roc_auc)
         # prauc_scores.append(prauc)
-
+        print("fp_rate:", fp_rate)
+        print("tp_rate:", tp_rate)
+        print("auc_rate:", auc_rate)
+        print("threshold:", thresholds)
         print("ROC AUC SCORE FOR [%d](anomaly class): %f" % (self.anomaly_class, roc_auc))
         print("PRAUC SCORE FOR [%d](anomaly class): %f" % (self.anomaly_class, prauc))
         print('[OK]')
@@ -302,7 +314,7 @@ class Ganomaly:
 
 
 if __name__ == '__main__':
-    model = Ganomaly(batch_size=128, epochs=10, anomaly_class=2)
+    model = Ganomaly(batch_size=128, epochs=2500, anomaly_class=2)
     model.train()
     model.eval()
 

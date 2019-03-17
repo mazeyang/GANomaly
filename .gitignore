@@ -9,3 +9,6 @@ test_lab
 
 gan/discriminator
 gan/generator
+
+data
+
