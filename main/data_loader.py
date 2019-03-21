@@ -2,12 +2,12 @@ import os
 import numpy as np
 from skimage import io, transform
 
-DATASET_ROOT = '../data/ucsd_ped'  # UCSD ped data set. including two folders: 'data' and 'label'
+DATASET_ROOT = '/disk/scott/data/ucsd_ped'  # UCSD ped data set. including two folders: 'data' and 'label'
 
 DATA_DIR = os.path.join(DATASET_ROOT, 'data')  # including 'ped1' and 'ped2'
 LABEL_DIR = os.path.join(DATASET_ROOT, 'label')  # label data (e.g. 'UCSDped1_testing_frames_Test001.txt')
 
-STORE_DIR = DATASET_ROOT  # store serialized data
+STORE_DIR = '../data'  # store serialized data
 
 
 def load_ped(reprocess=False, resize=False, shape=None):
@@ -143,7 +143,7 @@ def load_ped_test(reprocess=False, resize=False, shape=None):
 if __name__ == '__main__':
     print('load ucsd ped...')
 
-    (X_train, Y_train), (X_test, Y_test) = load_ped(reprocess=True)
+    (X_train, Y_train), (X_test, Y_test) = load_ped(reprocess=True, resize=True, shape=(28, 28))
     print('X_train.shape:', X_train.shape)
     print('Y_train.shape:', Y_train.shape)
     print('X_test.shape:', X_test.shape)

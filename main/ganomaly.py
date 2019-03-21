@@ -6,6 +6,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
+from sklearn.cluster import KMeans
 
 from sklearn.metrics import roc_auc_score, average_precision_score, roc_curve, auc
 from sklearn.model_selection import train_test_split
@@ -16,19 +17,22 @@ import matplotlib.pyplot as plt
 import os
 from skimage import io, transform
 
+import data_loader
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
 
 class Ganomaly:
-    def __init__(self, latent_dim=100, input_shape=(28, 28, 1), batch_size=128, epochs=40000, normal_class=2):
+    def __init__(self, latent_dim=100, input_shape=(28, 28, 1), batch_size=128, epochs=40000, scaling_times=2):
         self.latent_dim = latent_dim
         self.input_shape = input_shape
         self.batch_size = batch_size
         self.epochs = epochs
-        self.normal_class = normal_class
+        self.scaling_times = scaling_times
 
+    '''
     def get_mnist_data(self):
         print('get train and tst data...')
         (X1, Y1), (X2, Y2) = mnist.load_data()
@@ -68,11 +72,23 @@ class Ganomaly:
 
         print('train samples: %d, test samples: %d.' % (len(self.X_train), len(self.X_test)))
         print('[OK]')
+    '''
 
-    def find_cls(self, cls):
-        for index, label in enumerate(self.Y_test):
-            if label == cls:
-                return index
+    def get_ped_data(self):
+        print('load ped data...')
+        (X_train, Y_train), (X_test, Y_test) = data_loader.load_ped()
+        
+        X_train = X_train[:, :, :, 0]
+        X_test = X_test[:, :, :, 0]
+        X_train = np.expand_dims(X_train, axis=3)
+        X_test = np.expand_dims(X_test, axis=3)
+
+        # Rescale -1 to 1
+        X_train = (X_train.astype(np.float32) - 127.5) / 127.5
+        X_test = (X_test.astype(np.float32) - 127.5) / 127.5
+
+        self.X_train, self.Y_train, self.X_test, self.Y_test = X_train, Y_train, X_test, Y_test
+        print('OK')
 
     def basic_encoder(self):
         modelE = Sequential()
@@ -189,7 +205,7 @@ class Ganomaly:
         print('[OK]')
 
     def train(self):
-        self.get_mnist_data()
+        self.get_ped_data()
         self.make_components()
 
         # Adversarial ground truths
@@ -231,11 +247,87 @@ class Ganomaly:
         plt.plot(np.asarray(self.d_loss_list)[:, 0], label='D loss')
         plt.plot(np.asarray(self.d_loss_list)[:, 1], label='D accuracy')
         plt.legend(bbox_to_anchor=(1, 1))
-        plt.savefig("loss_%d.png" % self.normal_class, bbox_inches='tight', pad_inches=1)
+        plt.savefig("../imgs/loss_%d.png" % self.epochs, bbox_inches='tight', pad_inches=1)
         plt.close()
 
         print('[OK]')
 
+    def eval(self):
+        print('evaluate on test data...')
+        print('generate z1...')
+        z1_gen_ema = self.encoder1.predict(self.X_test)
+        print('generate fake images...')
+        reconstruct_ema = self.generator.predict(z1_gen_ema)
+        print('generate z2...')
+        z2_gen_ema = self.encoder2.predict(reconstruct_ema)
+
+        val_list = []
+        loss_list = []
+        for i in range(0, len(self.X_test)):
+            val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
+            loss_list.append(np.sum(np.square(reconstruct_ema[i] - self.X_test[i])))
+        val_arr = np.asarray(val_list)
+        loss_arr = np.asarray(loss_list)
+        val_probs = val_arr / max(val_arr)
+
+        anomaly_labels = self.Y_test
+
+        # preview val
+        idx = np.random.randint(0, len(val_arr), 100)
+        print('-loss_arr- -val_arr- -val_probs- -anomaly_labels-')
+        print('--------------------------------------')
+        for i in idx:
+            print(loss_arr[i], val_arr[i], val_probs[i], anomaly_labels[i])
+        print('--------------------------------------')
+
+        fp_rate, tp_rate, thresholds = roc_curve(anomaly_labels, val_probs)
+        auc_rate = auc(fp_rate, tp_rate)
+        roc_auc = roc_auc_score(anomaly_labels, val_probs)
+        prauc = average_precision_score(anomaly_labels, val_probs)
+        # roc_auc_scores.append(roc_auc)
+        # prauc_scores.append(prauc)
+        print("fp_rate:", fp_rate)
+        print("tp_rate:", tp_rate)
+        print("auc_rate:", auc_rate)
+        print("threshold:", thresholds)
+        print("ROC AUC SCORE: %f" % roc_auc)
+        print("PRAUC SCORE: %f" % prauc)
+        print('[OK]')
+
+    def eval_on_frame(self):
+        print('evaluate on test data...')
+        print('generate z1...')
+        z1_gen_ema = self.encoder1.predict(self.X_test)
+        print('generate fake images...')
+        reconstruct_ema = self.generator.predict(z1_gen_ema)
+        print('generate z2...')
+        z2_gen_ema = self.encoder2.predict(reconstruct_ema)
+
+        val_list = []
+        loss_list = []
+        for i in range(0, len(self.X_test)):
+            val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
+        val_arr = np.asarray(val_list)
+        val_probs = self.scale(val_arr)
+
+        anomaly_labels = self.Y_test
+
+    def scale(self, x_):
+        x_ = (x_ - min(x_)) / (max(x_) - min(x_))
+        x_.sort()
+        y = x_.reshape(-1, 1)
+        km = KMeans(n_clusters=2, random_state=1)
+        km.fit(y)
+        lst = km.labels_
+        len_, sum_ = len(lst), sum(lst)
+
+        pos = sum_ if lst[0] == 1 else (len_ - sum_)
+        threshold = (x_[pos - 1] + x_[pos]) / 2
+        x_norm = [i / self.scaling_times if i <= threshold else i + (1 - i) / self.scaling_times for i in x_]
+        return x_norm
+
+
+'''
     def eval(self):
         print('evaluate on test data...')
         print('generate z1...')
@@ -312,9 +404,9 @@ class Ganomaly:
             axs[1, j].axis('off')
         fig.savefig("recons_%d.png" % self.normal_class)
         plt.close()
-
+'''
 
 if __name__ == '__main__':
-    model = Ganomaly(batch_size=128, epochs=2500, normal_class=2)
+    model = Ganomaly(batch_size=128, epochs=2500)
     model.train()
     model.eval()
