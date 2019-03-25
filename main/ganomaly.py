@@ -269,15 +269,14 @@ class Ganomaly:
         z2_gen_ema = self.encoder2.predict(reconstruct_ema)
 
         val_list = []
-        loss_list = []
         for i in range(0, len(self.X_test)):
             val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
         val_arr = np.asarray(val_list)
         val_probs = self.scale(val_arr)
 
         scores1, scores0 = [], []
-        for k, v in self.frame_map.iteritems():
-            box_list = v['box_idx']
+        for k, v in self.frame_map.items():
+            box_list = v['box_index']
             label = v['label']
             frame_score = sum([val_probs[i] for i in box_list])
             if label == 1:
@@ -288,13 +287,14 @@ class Ganomaly:
         index1 = [i for i in range(len(scores1))]
         index0 = [i for i in range(len(scores0))]
         plt.title('Result Analysis')
-        plt.plot(index1, scores1, color='green', label='anomaly samples')
-        plt.plot(index0, scores0, color='red', label='normal samples')
+        example_num = 200
+        plt.plot(index1[:example_num], scores1[:example_num], color='green', label='anomaly samples')
+        plt.plot(index0[:example_num], scores0[:example_num], color='red', label='normal samples')
         plt.legend()  # 显示图例
 
         plt.xlabel('frame cnt')
         plt.ylabel('score')
-        plt.savefig('../imgs/score.png')
+        plt.savefig('../imgs/score_%d.png' % self.epochs)
 
     def scale(self, x_):
         x_ = (x_ - np.min(x_)) / (np.max(x_) - np.min(x_))
@@ -303,14 +303,16 @@ class Ganomaly:
         km = KMeans(n_clusters=2, random_state=1)
         km.fit(y)
         lst = km.labels_
-        len_, sum_ = len(lst), sum(lst)
-        pos = sum_ if lst[0] == 1 else (len_ - sum_)
-        threshold = (x_[pos - 1] + x_[pos]) / 2
+        pos = 0
+        for idx in range(len(lst) - 1):
+            if lst[idx] != lst[idx + 1]:
+                pos = idx
+        threshold = (x_[pos] + x_[pos + 1]) / 2
         x_norm = [i / self.scaling_times if i <= threshold else i + (1 - i) / self.scaling_times for i in x_]
         return x_norm
 
 
 if __name__ == '__main__':
-    model = Ganomaly(batch_size=128, epochs=2500)
+    model = Ganomaly(batch_size=128, epochs=100)
     model.train()
     model.eval()

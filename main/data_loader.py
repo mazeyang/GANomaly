@@ -179,4 +179,4 @@ if __name__ == '__main__':
     print('Y_train.shape:', Y_train.shape)
     print('X_test.shape:', X_test.shape)
     print('frame_map shape:', len(frame_map))
-    print('save [OK}')
+    print('save [OK]')
