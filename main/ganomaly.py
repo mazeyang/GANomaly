@@ -23,6 +23,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
+MODEL_DIR = '../model/'
+
 
 class Ganomaly:
     def __init__(self, latent_dim=100, input_shape=(28, 28, 1), batch_size=128, epochs=40000, scaling_times=2):
@@ -242,6 +244,11 @@ class Ganomaly:
             self.g_loss_list.append(g_loss)
             self.d_loss_list.append(d_loss)
 
+        # save models
+        self.encoder1.save(os.path.join(MODEL_DIR, 'encoder1.h5'))
+        self.encoder2.save(os.path.join(MODEL_DIR, 'encoder2.h5'))
+        self.generator.save(os.path.join(MODEL_DIR, 'generator.h5'))
+
         # save loss img
         plt.plot(np.asarray(self.g_loss_list)[:, 0], label='G loss')
         plt.plot(np.asarray(self.d_loss_list)[:, 0], label='D loss')
@@ -265,62 +272,18 @@ class Ganomaly:
         loss_list = []
         for i in range(0, len(self.X_test)):
             val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
-            loss_list.append(np.sum(np.square(reconstruct_ema[i] - self.X_test[i])))
-        val_arr = np.asarray(val_list)
-        loss_arr = np.asarray(loss_list)
-        val_probs = val_arr / max(val_arr)
-
-        anomaly_labels = self.Y_test
-
-        # preview val
-        idx = np.random.randint(0, len(val_arr), 100)
-        print('-loss_arr- -val_arr- -val_probs- -anomaly_labels-')
-        print('--------------------------------------')
-        for i in idx:
-            print(loss_arr[i], val_arr[i], val_probs[i], anomaly_labels[i])
-        print('--------------------------------------')
-
-        fp_rate, tp_rate, thresholds = roc_curve(anomaly_labels, val_probs)
-        auc_rate = auc(fp_rate, tp_rate)
-        roc_auc = roc_auc_score(anomaly_labels, val_probs)
-        prauc = average_precision_score(anomaly_labels, val_probs)
-        # roc_auc_scores.append(roc_auc)
-        # prauc_scores.append(prauc)
-        print("fp_rate:", fp_rate)
-        print("tp_rate:", tp_rate)
-        print("auc_rate:", auc_rate)
-        print("threshold:", thresholds)
-        print("ROC AUC SCORE: %f" % roc_auc)
-        print("PRAUC SCORE: %f" % prauc)
-        print('[OK]')
-
-    def eval_on_frame(self):
-        print('evaluate on test data...')
-        print('generate z1...')
-        z1_gen_ema = self.encoder1.predict(self.X_test)
-        print('generate fake images...')
-        reconstruct_ema = self.generator.predict(z1_gen_ema)
-        print('generate z2...')
-        z2_gen_ema = self.encoder2.predict(reconstruct_ema)
-
-        val_list = []
-        loss_list = []
-        for i in range(0, len(self.X_test)):
-            val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
         val_arr = np.asarray(val_list)
         val_probs = self.scale(val_arr)
 
-        scores1, labels1, scores0, label0 = [], [], [], []
+        scores1, scores0 = [], []
         for k, v in self.frame_map.iteritems():
             box_list = v['box_idx']
             label = v['label']
             frame_score = sum([val_probs[i] for i in box_list])
             if label == 1:
                 scores1.append(frame_score)
-                labels1.append(label)
             else:
                 scores0.append(frame_score)
-                label0.append(label)
 
         index1 = [i for i in range(len(scores1))]
         index0 = [i for i in range(len(scores0))]
@@ -331,6 +294,7 @@ class Ganomaly:
 
         plt.xlabel('frame cnt')
         plt.ylabel('score')
+        plt.savefig('../imgs/score.png')
 
     def scale(self, x_):
         x_ = (x_ - np.min(x_)) / (np.max(x_) - np.min(x_))
@@ -345,85 +309,6 @@ class Ganomaly:
         x_norm = [i / self.scaling_times if i <= threshold else i + (1 - i) / self.scaling_times for i in x_]
         return x_norm
 
-
-'''
-    def eval(self):
-        print('evaluate on test data...')
-        print('generate z1...')
-        z1_gen_ema = self.encoder1.predict(self.X_test)
-        print('generate fake images...')
-        reconstruct_ema = self.generator.predict(z1_gen_ema)
-        print('generate z2...')
-        z2_gen_ema = self.encoder2.predict(reconstruct_ema)
-
-        val_list = []
-        for i in range(0, len(self.X_test)):
-            val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
-
-        anomaly_labels = np.zeros(len(val_list))
-        for i, label in enumerate(self.Y_test):
-            if label == self.normal_class:
-                anomaly_labels[i] = 1
-
-        val_arr = np.asarray(val_list)
-        val_probs = val_arr / max(val_arr)
-        # print('val_arr:')
-        # print(val_arr[:50])
-        # print('val_probs:')
-        # print(val_probs[:50])
-        # print('anomaly labels:')
-        # print(anomaly_labels[:50])
-
-        # preview val
-        idx = np.random.randint(0, len(val_arr), 100)
-        print('-val_arr- -val_probs- -anomaly_labels-')
-        print('--------------------------------------')
-        for i in idx:
-            print(val_arr[i], val_probs[i], anomaly_labels[i])
-
-        fp_rate, tp_rate, thresholds = roc_curve(anomaly_labels, val_probs)
-        auc_rate = auc(fp_rate, tp_rate)
-        roc_auc = roc_auc_score(anomaly_labels, val_probs)
-        prauc = average_precision_score(anomaly_labels, val_probs)
-        # roc_auc_scores.append(roc_auc)
-        # prauc_scores.append(prauc)
-        print("fp_rate:", fp_rate)
-        print("tp_rate:", tp_rate)
-        print("auc_rate:", auc_rate)
-        print("threshold:", thresholds)
-        print("ROC AUC SCORE FOR [%d](anomaly class): %f" % (self.normal_class, roc_auc))
-        print("PRAUC SCORE FOR [%d](anomaly class): %f" % (self.normal_class, prauc))
-        print('[OK]')
-
-        r, c = 2, 10
-
-        print('find_class...')
-        input_list = []
-        for i in range(0, 10):
-            index = self.find_cls(i)
-            input_list.append(self.X_test[index])
-        print('[OK]')
-
-        input_arr = np.asarray(input_list)
-        print('get z gen ema...')
-        z_gen_ema = self.encoder1.predict(input_arr)
-        print('get reconstruct ema...')
-        reconstruct_ema = self.generator.predict(z_gen_ema)
-        print('[OK]')
-        print('it\'s show time')
-        fig, axs = plt.subplots(r, c)
-        for j in range(c):
-            input_pl = np.reshape(input_arr[j], (28, 28))
-            axs[0, j].imshow(input_pl, cmap='gray')
-            axs[0, j].axis('off')
-
-            reconstruct_ema_pl = 0.5 * reconstruct_ema[j] + 0.5
-            reconstruct_ema_pl = np.reshape(reconstruct_ema_pl, (28, 28))
-            axs[1, j].imshow(reconstruct_ema_pl, cmap='gray')
-            axs[1, j].axis('off')
-        fig.savefig("recons_%d.png" % self.normal_class)
-        plt.close()
-'''
 
 if __name__ == '__main__':
     model = Ganomaly(batch_size=128, epochs=2500)
