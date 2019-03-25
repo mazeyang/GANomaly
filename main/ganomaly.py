@@ -4,7 +4,7 @@ from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers import MaxPooling2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam
 from sklearn.cluster import KMeans
 
@@ -245,9 +245,9 @@ class Ganomaly:
             self.d_loss_list.append(d_loss)
 
         # save models
-        self.encoder1.save(os.path.join(MODEL_DIR, 'encoder1.h5'))
-        self.encoder2.save(os.path.join(MODEL_DIR, 'encoder2.h5'))
-        self.generator.save(os.path.join(MODEL_DIR, 'generator.h5'))
+        self.encoder1.save(os.path.join(MODEL_DIR, ('encoder1_%d.h5' % self.epochs)))
+        self.encoder2.save(os.path.join(MODEL_DIR, ('encoder2_%d.h5' % self.epochs)))
+        self.generator.save(os.path.join(MODEL_DIR, ('generator_%d.h5' % self.epochs)))
 
         # save loss img
         plt.plot(np.asarray(self.g_loss_list)[:, 0], label='G loss')
@@ -260,6 +260,10 @@ class Ganomaly:
         print('[OK]')
 
     def eval(self):
+        # self.get_ped_data()
+        # self.encoder1 = load_model(os.path.join(MODEL_DIR, 'encoder1.h5'))
+        # self.encoder2 = load_model(os.path.join(MODEL_DIR, 'encoder2.h5'))
+        # self.generator = load_model(os.path.join(MODEL_DIR, 'generator.h5'))
         print('evaluate on test data...')
         print('generate z1...')
         z1_gen_ema = self.encoder1.predict(self.X_test)
@@ -278,16 +282,17 @@ class Ganomaly:
         for k, v in self.frame_map.items():
             box_list = v['box_index']
             label = v['label']
-            frame_score = sum([val_probs[i] for i in box_list])
+            frame_score = np.sum([val_probs[i] for i in box_list])
             if label == 1:
                 scores1.append(frame_score)
             else:
                 scores0.append(frame_score)
-
+        scores1.sort()
+        scores0.sort()
         index1 = [i for i in range(len(scores1))]
         index0 = [i for i in range(len(scores0))]
         plt.title('Result Analysis')
-        example_num = 200
+        example_num = 5000
         plt.plot(index1[:example_num], scores1[:example_num], color='green', label='anomaly samples')
         plt.plot(index0[:example_num], scores0[:example_num], color='red', label='normal samples')
         plt.legend()  # 显示图例
@@ -297,10 +302,11 @@ class Ganomaly:
         plt.savefig('../imgs/score_%d.png' % self.epochs)
 
         acc_list = []
-        for threshold in np.arange(2.0, 5.0, 0.1):
-            cnt1 = np.sum([1 if x < threshold else 0 for x in index1])
-            cnt0 = np.sum([1 if x >= threshold else 0 for x in index0])
-            acc = (cnt0 + cnt1) / (len(index1) + len(index0))
+        for threshold in np.arange(0.05, 5, 0.02):
+            cnt1 = np.sum([1 if x >= threshold else 0 for x in scores1])
+            cnt0 = np.sum([1 if x < threshold else 0 for x in scores1])
+            acc = (cnt0 + cnt1) / (len(scores0) + len(scores1))
+            print('debug:', cnt0, cnt1, len(scores0), len(scores1), acc)
             acc_list.append(acc)
         acc_list.sort()
         print(acc_list)
@@ -322,6 +328,6 @@ class Ganomaly:
 
 
 if __name__ == '__main__':
-    model = Ganomaly(batch_size=128, epochs=100)
+    model = Ganomaly(batch_size=128, epochs=10000)
     model.train()
     model.eval()
