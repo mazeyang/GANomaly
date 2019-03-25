@@ -296,6 +296,15 @@ class Ganomaly:
         plt.ylabel('score')
         plt.savefig('../imgs/score_%d.png' % self.epochs)
 
+        acc_list = []
+        for threshold in np.arange(2.0, 5.0, 0.1):
+            cnt1 = np.sum([1 if x < threshold else 0 for x in index1])
+            cnt0 = np.sum([1 if x >= threshold else 0 for x in index0])
+            acc = (cnt0 + cnt1) / (len(index1) + len(index0))
+            acc_list.append(acc)
+        acc_list.sort()
+        print(acc_list)
+
     def scale(self, x_):
         x_ = (x_ - np.min(x_)) / (np.max(x_) - np.min(x_))
         x_.sort()
@@ -308,7 +317,7 @@ class Ganomaly:
             if lst[idx] != lst[idx + 1]:
                 pos = idx
         threshold = (x_[pos] + x_[pos + 1]) / 2
-        x_norm = [i / self.scaling_times if i <= threshold else i + (1 - i) / self.scaling_times for i in x_]
+        x_norm = [i / self.scaling_times if i <= threshold else 1 - (1 - i) / self.scaling_times for i in x_]
         return x_norm
 
 
