@@ -320,7 +320,6 @@ class Ganomaly:
         km.fit(y)
         lst = km.labels_
         len_, sum_ = len(lst), sum(lst)
-
         pos = sum_ if lst[0] == 1 else (len_ - sum_)
         threshold = (x_[pos - 1] + x_[pos]) / 2
         x_norm = [i / self.scaling_times if i <= threshold else i + (1 - i) / self.scaling_times for i in x_]
