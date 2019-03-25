@@ -76,7 +76,7 @@ class Ganomaly:
 
     def get_ped_data(self):
         print('load ped data...')
-        (X_train, Y_train), (X_test, Y_test) = data_loader.load_ped()
+        X_train, Y_train, X_test, frame_map = data_loader.load_ped()
         
         X_train = X_train[:, :, :, 0]
         X_test = X_test[:, :, :, 0]
@@ -87,7 +87,7 @@ class Ganomaly:
         X_train = (X_train.astype(np.float32) - 127.5) / 127.5
         X_test = (X_test.astype(np.float32) - 127.5) / 127.5
 
-        self.X_train, self.Y_train, self.X_test, self.Y_test = X_train, Y_train, X_test, Y_test
+        self.X_train, self.Y_train, self.X_test, self.frame_map = X_train, Y_train, X_test, frame_map
         print('OK')
 
     def basic_encoder(self):
@@ -310,10 +310,30 @@ class Ganomaly:
         val_arr = np.asarray(val_list)
         val_probs = self.scale(val_arr)
 
-        anomaly_labels = self.Y_test
+        scores1, labels1, scores0, label0 = [], [], [], []
+        for k, v in self.frame_map.iteritems():
+            box_list = v['box_idx']
+            label = v['label']
+            frame_score = sum([val_probs[i] for i in box_list])
+            if label == 1:
+                scores1.append(frame_score)
+                labels1.append(label)
+            else:
+                scores0.append(frame_score)
+                label0.append(label)
+
+        index1 = [i for i in range(len(scores1))]
+        index0 = [i for i in range(len(scores0))]
+        plt.title('Result Analysis')
+        plt.plot(index1, scores1, color='green', label='anomaly samples')
+        plt.plot(index0, scores0, color='red', label='normal samples')
+        plt.legend()  # 显示图例
+
+        plt.xlabel('frame cnt')
+        plt.ylabel('score')
 
     def scale(self, x_):
-        x_ = (x_ - min(x_)) / (max(x_) - min(x_))
+        x_ = (x_ - np.min(x_)) / (np.max(x_) - np.min(x_))
         x_.sort()
         y = x_.reshape(-1, 1)
         km = KMeans(n_clusters=2, random_state=1)

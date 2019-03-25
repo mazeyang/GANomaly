@@ -12,6 +12,7 @@ LABEL_DIR = os.path.join(DATASET_ROOT, 'label')  # label data (e.g. 'UCSDped1_te
 
 STORE_DIR = '../data'  # store serialized data
 
+lazy_train = True
 
 def load_ped(reprocess=False, resize=False, shape=None):
     '''
@@ -48,11 +49,16 @@ def load_ped_train(reprocess=False, resize=False, shape=None):
     dtype: ndarry
     '''
     train_path = os.path.join(STORE_DIR, 'train.npz')
+    # for lazy man
+    if lazy_train:
+        data = np.load(train_path)
+        return data['data'], data['label']
+
     # check serialized data
     if not reprocess and not resize and os.path.exists(train_path):
         data = np.load(train_path)
         return data['data'], data['label']
-    
+
     # process now
     file_dir1 = DATA_DIR
     pkgs = ['ped1', 'ped2']
@@ -102,7 +108,8 @@ def load_ped_test(reprocess=False, resize=False, shape=None):
     # check serialized data
     if not reprocess and not resize and os.path.exists(test_path) and os.path.exists(frame_map_path):
         data = np.load(test_path)
-        frame_map = json.load(open(frame_map_path, 'r'))
+        with open(frame_map_path, 'r') as f:
+            frame_map = json.load(f)
         return data['data'], frame_map
 
     # process now
@@ -141,7 +148,7 @@ def load_ped_test(reprocess=False, resize=False, shape=None):
                 if frame_id not in frame_map.keys():
                     frame_map[frame_id] = dict()
                     frame_map[frame_id]['box_index'] = [box_idx]
-                    frame_map[frame_id]['label'] = video_label[int(box_idx[13:16])]
+                    frame_map[frame_id]['label'] = video_label[int(box[13:16])]
                     frame_idx += 1
                 else:
                     frame_map[frame_id]['box_index'].append(box_idx)
@@ -151,7 +158,7 @@ def load_ped_test(reprocess=False, resize=False, shape=None):
                 pkg_data = video_data
             else:
                 pkg_data = np.vstack((pkg_data, video_data))
-            
+
         if test_data is None:
             test_data = pkg_data
         else:
@@ -165,7 +172,9 @@ if __name__ == '__main__':
     print('load ucsd ped...')
     X_train, Y_train, X_test, frame_map = load_ped(reprocess=True, resize=True, shape=(28, 28))
     np.savez(os.path.join(STORE_DIR, 'train.npz'), data=X_train, label=Y_train)
-    json.dump(open(os.path.join(STORE_DIR, 'frame_map.json'), 'w'), frame_map)
+    np.savez(os.path.join(STORE_DIR, 'test.npz'), data=X_test)
+    with open(os.path.join(STORE_DIR, 'frame_map.json'), 'w') as f:
+        json.dump(frame_map, f)
     print('X_train.shape:', X_train.shape)
     print('Y_train.shape:', Y_train.shape)
     print('X_test.shape:', X_test.shape)
