@@ -1,3 +1,4 @@
+import keras.backend as K
 from keras.datasets import mnist
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
@@ -15,6 +16,7 @@ import numpy as np
 import warnings
 import matplotlib.pyplot as plt
 import os
+import tensorflow as tf
 from skimage import io, transform
 
 import data_loader
@@ -34,47 +36,15 @@ class Ganomaly:
         self.epochs = epochs
         self.scaling_times = scaling_times
 
-    '''
-    def get_mnist_data(self):
-        print('get train and tst data...')
-        (X1, Y1), (X2, Y2) = mnist.load_data()
-        X = np.vstack([X1, X2])
-        Y = np.hstack([Y1, Y2])
+    ''' type-1 loss, type2 loss and bce loss'''
+    def l1_loss(self, y_true, y_pred):
+        return K.mean(K.abs(y_pred - y_true))
 
-        X_non_rem = []
-        Y_non_rem = []
-        X_rem = []
-        Y_rem = []
-        for i, label in enumerate(Y):
-            if label != self.normal_class:
-                X_non_rem.append(X[i])
-                Y_non_rem.append(Y[i])
-            else:
-                X_rem.append(X[i])
-                Y_rem.append(Y[i])
+    def l2_loss(self, y_true, y_pred):
+        return K.mean(K.square(y_pred - y_true))
 
-        X_non_rem = np.asarray(X_non_rem)
-        X_rem = np.asarray(X_rem)
-
-        X_train, X_test_rem, Y_train, Y_test_rem = train_test_split(
-            X_non_rem, Y_non_rem, test_size=0.2, random_state=42)
-
-        X_test = np.vstack([X_test_rem, X_rem])
-        Y_test = np.hstack([Y_test_rem, Y_rem])
-
-        # Rescale -1 to 1
-        X_train = (X_train.astype(np.float32) - 127.5) / 127.5
-        X_test = (X_test.astype(np.float32) - 127.5) / 127.5
-
-        # expand dimensions
-        X_train = np.expand_dims(X_train, axis=3)
-        X_test = np.expand_dims(X_test, axis=3)
-
-        self.X_train, self.Y_train, self.X_test, self.Y_test = X_train, Y_train, X_test, Y_test
-
-        print('train samples: %d, test samples: %d.' % (len(self.X_train), len(self.X_test)))
-        print('[OK]')
-    '''
+    def bce_loss(self, y_pred, y_true):
+        return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred))
 
     def get_ped_data(self):
         print('load ped data...')
@@ -196,6 +166,10 @@ class Ganomaly:
 
         # The discriminator takes generated images as input and determines if real or fake
         self.real_or_fake = self.discriminator(self.img_)
+
+        self.img_loss = self.l2_loss(self.img, self.img_)
+        self.z_loss = self.l1_loss(self.z, self.z_)
+        self.adver_loss = self.bce_loss(self.)
 
         self.ganomaly_model = Model(self.img, [self.real_or_fake, self.img_, self.z_])
         self.ganomaly_model.compile(loss=['binary_crossentropy', 'mean_absolute_error', 'mean_squared_error'],

@@ -1,12 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-This a template code for the implement of Ganormal based on tensorflow 1.5.0.
-test dataset is mnist. one class is considered as abormal, and others are considered as normal.
-Actually this abnormal-detection idea is very good for the claissification missions while the
-training dataset is very imbalanced.
-All right reseveved by Laboro.ai
-"""
-
 import os
 import cv2
 import numpy as np

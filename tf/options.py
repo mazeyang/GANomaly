@@ -8,7 +8,7 @@ def get_config(is_train):
         opts.batch_size = 300
         opts.isize = 32
         opts.lr = 1e-4
-        opts.iteration = 2
+        opts.iteration = 15
         opts.ckpt_dir = "ckpt"
         opts.z_size = 100
         opts.image_channel = 1

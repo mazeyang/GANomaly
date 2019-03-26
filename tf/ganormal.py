@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from __future__ import print_function
 from tensorflow.python.keras.layers import Input, Reshape, Dense, Dropout, MaxPooling2D, Conv2D, Flatten
 from tensorflow.python.keras.layers import Conv2DTranspose
