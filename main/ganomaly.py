@@ -260,10 +260,10 @@ class Ganomaly:
         print('[OK]')
 
     def eval(self):
-        # self.get_ped_data()
-        # self.encoder1 = load_model(os.path.join(MODEL_DIR, 'encoder1.h5'))
-        # self.encoder2 = load_model(os.path.join(MODEL_DIR, 'encoder2.h5'))
-        # self.generator = load_model(os.path.join(MODEL_DIR, 'generator.h5'))
+        self.get_ped_data()
+        self.encoder1 = load_model(os.path.join(MODEL_DIR, 'encoder1_3700.h5'))
+        self.encoder2 = load_model(os.path.join(MODEL_DIR, 'encoder2_3700.h5'))
+        self.generator = load_model(os.path.join(MODEL_DIR, 'generator_3700.h5'))
         print('evaluate on test data...')
         print('generate z1...')
         z1_gen_ema = self.encoder1.predict(self.X_test)
@@ -276,8 +276,14 @@ class Ganomaly:
         for i in range(0, len(self.X_test)):
             val_list.append(np.mean(np.square(z1_gen_ema[i] - z2_gen_ema[i])))
         val_arr = np.asarray(val_list)
-        val_probs = self.scale(val_arr)
 
+        # show box score
+        y = np.copy(val_arr)
+        y.sort()
+        plt.plot([i for i in range(len(y))], y)
+        plt.savefig('../imgs/box_score.png')
+
+        val_probs = self.scale(val_arr)
         scores1, scores0 = [], []
         for k, v in self.frame_map.items():
             box_list = v['box_index']
@@ -312,22 +318,28 @@ class Ganomaly:
         print(acc_list)
 
     def scale(self, x_):
+        lenx, part = len(x_), int(0.9 * len(x_))
+        if lenx <= 1:
+            return x_
         x_ = (x_ - np.min(x_)) / (np.max(x_) - np.min(x_))
         x_.sort()
-        y = x_.reshape(-1, 1)
+        y_ = x_[min(lenx - 2, part):]
+        z = y_.reshape(-1, 1)
         km = KMeans(n_clusters=2, random_state=1)
-        km.fit(y)
+        km.fit(z)
         lst = km.labels_
         pos = 0
         for idx in range(len(lst) - 1):
             if lst[idx] != lst[idx + 1]:
                 pos = idx
-        threshold = (x_[pos] + x_[pos + 1]) / 2
+        threshold = (y_[pos] + y_[pos + 1]) / 2
         x_norm = [i / self.scaling_times if i <= threshold else 1 - (1 - i) / self.scaling_times for i in x_]
+        anomaly_cnt = sum([1 if i > threshold else 0 for i in x_])
+        print('anomaly rate(box level):%.6f%%.' % (anomaly_cnt / lenx * 100))
         return x_norm
 
 
 if __name__ == '__main__':
-    model = Ganomaly(batch_size=128, epochs=10000)
-    model.train()
+    model = Ganomaly(batch_size=128, epochs=3000)
+    # model.train()
     model.eval()
